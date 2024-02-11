@@ -722,7 +722,7 @@ function.</p>
 <pre><code>## function (x, na.rm = FALSE) 
 ## sqrt(var(if (is.vector(x) || is.factor(x)) x else as.double(x), 
 ##     na.rm = na.rm))
-## &lt;bytecode: 0x7f9910a7a800&gt;
+## &lt;bytecode: 0x7f8d6093aa50&gt;
 ## &lt;environment: namespace:stats&gt;</code></pre>
 </div>
 <div id="vectors" class="section level2">
@@ -1197,7 +1197,21 @@ essentially made up of a bunch of vectors (columns) with each vector
 containing its own data type but the data type can be different between
 vectors.</p>
 <p>Here is an example dataframe in R, built-in to the language as an
-example:</p>
+example.</p>
+<p>The Iris dataset is a classic dataset in the field of machine
+learning and statistics, often used for demonstrating classification
+algorithms. It contains 150 samples of iris flowers, evenly distributed
+across three different species: Iris setosa, Iris versicolor, and Iris
+virginica. Each sample is described by four features: the length and the
+width of the sepals and petals, in centimeters.</p>
+<p>The dataset was introduced by the British statistician and biologist
+Ronald Fisher in his 1936 paper, “The use of multiple measurements in
+taxonomic problems” as an example of linear discriminant analysis. Since
+then, the Iris dataset has become a popular example for testing and
+demonstrating the effectiveness of various machine learning algorithms,
+especially those used for classification purposes. It’s simplicity and
+small size make it an ideal dataset for beginners to learn the basics of
+data handling, visualization, and machine learning techniques.</p>
 <pre class="r"><code>iris</code></pre>
 <pre><code>##     Sepal.Length Sepal.Width Petal.Length Petal.Width    Species
 ## 1            5.1         3.5          1.4         0.2     setosa
