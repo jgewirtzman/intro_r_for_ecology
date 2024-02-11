@@ -28,7 +28,7 @@ library(vegan) #vegan is a community ecology package, short for "vegetation anal
 
 #import the data
 #you will replace this line with the pathname of the appropriate folder>file destination on your computer
-trees<-read.csv("/Users/jongewirtzman/Google Drive/Teaching/BOT 315/Labs/BOT 315 Tree Inventory Data - Compiled.csv")
+trees<-read.csv("data/bot315_tree_inventory.csv")
 
 #this makes a new column, genus, which contains text from the species column only until the first blank space
 #this is called a "regular expression" or "regex". they look scary but you can google how to write them!
