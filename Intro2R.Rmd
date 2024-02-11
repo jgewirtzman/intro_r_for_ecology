@@ -651,7 +651,12 @@ list_1
 
 By far the most commonly used data structure to store data in is the data frame. A data frame is a powerful two-dimensional object made up of rows and columns which looks superficially very similar to a matrix. However, whilst matrices are restricted to containing data all of the same type, data frames can contain a mixture of different types of data. Typically, in a data frame each row corresponds to an individual observation and each column corresponds to a different measured or recorded variable. This setup may be familiar to those of you who use LibreOffice Calc or Microsoft Excel to manage and store your data. Perhaps a useful way to think about data frames is that they are essentially made up of a bunch of vectors (columns) with each vector containing its own data type but the data type can be different between vectors.
 
-Here is an example dataframe in R, built-in to the language as an example:
+Here is an example dataframe in R, built-in to the language as an example.
+
+The Iris dataset is a classic dataset in the field of machine learning and statistics, often used for demonstrating classification algorithms. It contains 150 samples of iris flowers, evenly distributed across three different species: Iris setosa, Iris versicolor, and Iris virginica. Each sample is described by four features: the length and the width of the sepals and petals, in centimeters.
+
+The dataset was introduced by the British statistician and biologist Ronald Fisher in his 1936 paper, "The use of multiple measurements in taxonomic problems" as an example of linear discriminant analysis. Since then, the Iris dataset has become a popular example for testing and demonstrating the effectiveness of various machine learning algorithms, especially those used for classification purposes. It's simplicity and small size make it an ideal dataset for beginners to learn the basics of data handling, visualization, and machine learning techniques.
+
 ```{r iris}
 iris
 ```
