@@ -1,0 +1,376 @@
+---
+title: "Plant Community Ecology"
+author: "Jon Gewirtzman"
+date: "2024-02-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Community Ecology Analyses in R
+
+In this exercise, we will take the data we collected in the field, and explore several ways to visualize the data, understand community structure within the plots, and investigate differences between the plots.
+
+We will begin by importing and cleaning our data.
+
+## Setup
+
+This code first loads our packages, tidyverse and vegan. Tidyverse is a big package containing smaller packages, including ggplot2, and dplyr, which has some useful tools for data wrangling and reshaping.
+
+One of the challenges of working with data is taking our own (human) language and turning it into a structure a computer can understand. While subjective observations are important, there's no way to plot or analyze them. So, if we have things like "note: species unsure", R doesn't know how to handle that. As a result, we must do some "data hygiene", or make sure the dataset is clean, clear, and analysis-ready.
+
+```{r init}
+# Load the necessary libraries
+library(tidyverse) #tidyverse has tools for data reshaping, and also includes ggplot2
+library(vegan) #vegan is a community ecology package, short for "vegetation analysis"
+
+#import the data
+#you will replace this line with the pathname of the appropriate folder>file destination on your computer
+trees<-read.csv("/Users/jongewirtzman/Google Drive/Teaching/BOT 315/Labs/BOT 315 Tree Inventory Data - Compiled.csv")
+
+#this makes a new column, genus, which contains text from the species column only until the first blank space
+#this is called a "regular expression" or "regex". they look scary but you can google how to write them!
+trees$genus<-sub("^(\\S+).*", "\\1", trees$Species)
+
+#this takes any genuses we didn't know (i.e., had a "?" in our species column), and converts the question marks to NA
+trees$genus[which(trees$genus=='?')]<-NA
+
+#view the imported data
+head(trees)
+```
+
+## Age/Stage Distributions
+
+In our week on population ecology, we explored the demographics of individual species. Now, let's explore the demographics of the entire community. Here, we will plot a size class distribution of each taxa (in this case, we will use genus, but we could just as easily use species, family, etc.) There are lots of ways to do this, and what I'm showing here isn't necessarily the simplest; it's just one approach. But, in brief, what I do here is: define some size classes I think are appropriate (in this case, 10cm increments of DBH), and group the trees into those classes. Then, I count how many of each genus fall into each class. Finally, I plot the count of each class, split up by each genus, using ggplot.
+
+Note: it's probably more common to do these analyses by species, rather than by genus; however, grouping them by genus will be convenient here both because of the relatively small number of individuals we measured in each species, and because of the number of individuals that we could only identify to genus rather than species. Winter is hard, and fieldwork takes a long time! As you go through these exercises, you should keep in the back of your mind that species matter too, and think about how these analyses might look different if we used a different taxonomic level. If you're curious, and want a coding challenge, you can even try seeing the results by modifying this code to run analyses on species rather than genus!
+
+```{r sizes}
+# Bin DBH into size classes
+  sizes<- filter(trees, `Live.Dead` == "Live")  # filter to only live trees, assuming we're interested in live individuals
+
+  sizes<- mutate(sizes, Size_Class = cut(DBH, breaks = seq(0, max(DBH, na.rm = TRUE), by = 10), 
+                                         include.lowest = TRUE)) #make bins from 0 to max DBH in increments of 10 cm, and add a column "Size_Class" noting which class eaxch observation falls in
+                 
+  sizes<- group_by(sizes, genus, Size_Class) #group the data by genus and size class
+  
+  sizes<- summarise(sizes, Count = n(), .groups = 'drop') #count how many of each genus are in each size class
+
+#print the new table
+print(sizes)
+```
+  
+```{r plotsize}
+  #plot size classes
+    ggplot(data=sizes,
+           aes(x = Size_Class, y = Count, fill = genus)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~genus, scales = "free_y") +
+  labs(x = "Size Class (DBH in cm)", y = "Count", title = "Size Class Distribution for Each Genus") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Alpha Diversity
+
+Now let's start to think about the structure within each plot. We can calculate a number of different metrics that help us understand what species are coexisting in these plots. We'll have explored these in lecture, but they include species richness, evenness, and diversity indices.
+
+These metrics all look at the number of occurrences of each taxon in each location. However, our raw data right is formatted to report each individual and its DBH; this doesn't *directly* tell us the count of each species or genus. However, just like above, we can re-shape and summarize the data to suit our needs.
+
+```{r prep}
+# Convert data to a format suitable for diversity analysis
+data_prepared <- count(trees, PlotID, genus) #count how many of each genus are in each plot
+head(data_prepared)
+
+#reshape this into a matrix, with a column for each genus
+data_prepared<-pivot_wider(data_prepared, names_from = genus, values_from = n, values_fill = list(n = 0)) #
+
+#view the count data
+print(data_prepared)
+```
+The package 'vegan' is super useful for community ecology. It's developed for plants, but works just as well for any type of community ecology data, e.g. exploring the structure of microbial communities in soils or the human gut! As with any package, it's helpful to read the documentation and make sure we know how to use the functions. We're going to want to explore diversity indices, so let's read about the package and the functions we're going to use. Note these won't be included in the Markdown file; you'll need to run these in R.
+
+```{r veganq}
+?vegan
+
+?diversity
+```
+
+Turns out, what we want to run these functions is a matrix of species counts by location, but with no additional elements. We almost have that in our object 'data_prepared', except that also has a column with plot IDs. Let's get rid of that, but also save those IDs as a vector so we can use them for labelling data and outputs later on.
+
+```{r matrix}
+# Extract the matrix of counts, excluding the plot column for analysis
+species_matrix <- select(data_prepared, -PlotID)
+
+#save the IDs of the plots
+PlotIDs<-data_prepared$PlotID
+
+#view the matrix and names
+print(species_matrix)
+print(PlotIDs)
+```
+
+Now we can run our diversity index functions, save the results, and view them.
+
+```{r metrics}
+# Calculate species richness (S)
+species_richness <- specnumber(species_matrix)
+
+# Calculate Shannon diversity (H')
+shannon_diversity <- diversity(species_matrix, index = "shannon")
+
+# Calculate Simpson diversity (1-D)
+simpson_diversity <- diversity(species_matrix, index = "simpson")
+
+# Calculate Evenness (E)
+evenness <- diversity(species_matrix, index = "shannon")/log(specnumber(species_matrix))
+
+# Combine the diversity metrics into a data frame
+diversity_data <- data.frame(
+  PlotID = data_prepared$PlotID,
+  Richness = round(species_richness, 2),
+  Shannon = round(shannon_diversity, 2),
+  Simpson = round(simpson_diversity, 2),
+  Evenness = round(evenness, 2)
+)
+
+#view the data frame
+print(diversity_data)
+```
+
+Let's pause here and make sure we understand what the functions are doing. Each of these is a built-in function of vegan, but we want to make sure we understand what a function is doing when we use it (and that we understand the ecological concepts we're actually exploring!).
+
+How is richness defined? It's a simple index: just the number of species in a plot. Let's check that the results we're getting make sense.
+
+How many species are in Plot 1_1?
+
+```{r richness}
+#subset just the counts from plot 1
+plot1_1<-species_matrix[1, ]
+plot1_1
+
+#check which species counts are greater than zero
+observed_species<-plot1_1 > 0
+observed_species
+
+#count how many species were observed
+#TRUE values count as 1, and FALSE values count as zero, so we can just sum them
+sum(observed_species)
+
+#let's make sure this matches what we saw above!
+sum(observed_species)==diversity_data[1, 'Richness']
+```
+
+Species richness is pretty intuitive-- just a sum. The other indices may be a little less intuitive. It's easy to just calculate them and use them without really thinking about what they tell you. But let's try a couple of calculations "by hand" so we really understand what's happening under the hood with these indices (and their associated R functions).
+
+```{r shannon}
+# Vector of species counts (each element represents the count of individuals for a species)
+#this is the number of species counts for plot 1_1, from above
+#as.vector(unlist()) just changes the data format to a plain vector for easier use
+species_counts <- as.vector(unlist(plot1_1))
+
+#remove the zeroes, so that we just have a list of counts for the species that were in fact observed
+species_counts <- species_counts[species_counts > 0]
+
+#the shannon index is defined in ?diversity; here is code to make the calculation manually
+
+proportions <- species_counts / sum(species_counts) # Calculate the proportion of each species
+
+shannon_index <- -sum(proportions * log(proportions)) # Calculate the Shannon index
+
+# Print the Shannon index
+print(shannon_index)
+```
+
+This matches what we calculated in vegan above-- but now we see why!
+
+Now try writing your own code, to calculate the Simpson index.
+
+```{r simpson}
+# start with species_counts, which we made above, for plot 1_1
+species_counts 
+
+#the simpson index is defined in ?diversity
+
+#write your own code below to calculate the simpson index for plot 1_1.
+
+
+
+
+
+# Print the Simpson index for this plot
+
+
+```
+
+Now that we've generated a table of values, and confirmed they are correct, we can plot them to help us visualize how the indices differ from one another and between plots. We can also plot one index vs. another to explore how they do or don't relate to one another.
+
+```{r plotdiv}
+#reshape the diversity metrics data for plotting
+diversity_long <- pivot_longer(diversity_data, cols = c(Richness, Evenness, Shannon, Simpson), names_to = "Metric", values_to = "Value")
+
+#plot the metrics
+ggplot(diversity_long, aes(x = PlotID, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~Metric, scales = "free_y") +
+  labs(title = "Diversity Metrics for Each Plot", x = "Plot", y = "Value") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
+
+#plot the relationships between metrics
+pairs(diversity_data[,c(2:5)])
+```
+
+## Relative Abundance
+
+We calculated the species richness in each plot above. But, we might want to know more about how many of each individual species are in each plot. Let's consider the species abundances.
+
+First, 
+
+```{r abundance}
+# we already aggreated data above to get abundance of each species in each plot
+#here's that calculation again
+
+species_abundance <- count(trees, PlotID, genus) #count how many of each genus are in each plot
+head(species_abundance)
+
+#let's just rename the column "n" to abundance, for easier interpretability
+names(species_abundance)[3]<-"Abundance"
+
+head(species_abundance)
+```
+
+We can't picture all of these numbers in our heads at once, so let's make a plot. Here, I'm grouping the species abundance by plot, then ranking each species in decreasing order of abundance, just to make the pattern clearer.
+
+```{r plotabund}
+# Rank the species within each plot based on abundance
+species_abundance_ranked <-  group_by(species_abundance, PlotID)
+
+species_abundance_ranked<- mutate(species_abundance_ranked, Rank = rank(-Abundance))  # Use rank with descending order of Abundance
+
+# Create rank abundance graphs with bars for each plot
+ggplot(species_abundance_ranked, aes(x = factor(Rank), y = Abundance, fill = genus)) +
+  geom_bar(stat = "identity", position = "dodge") +  # Use bars to represent abundance
+  facet_wrap(~PlotID, scales = "free_x") +  # Create a separate graph for each plot
+  labs(x = "Rank", y = "Abundance", title = "Rank Abundance Graph (Bar Plot) for Each Plot") +
+  theme_minimal() +
+  theme(legend.position = "bottom")  # Move legend to bottom for better layout
+```
+
+## Rarefaction
+
+Ok, so we've tried a few ways of understanding the ways species are structured in each plot. But what if we didn't find all the species? We'll have discussed rarefaction curves in class; now let's try making some.
+
+```{r rare}
+# Rarefaction curve
+raremax <- min(rowSums(species_matrix))  # Minimum sample size
+rarecurve(species_matrix, step=1, sample=raremax, col="blue", xlab="Number of Individuals", ylab="Species Richness")
+```
+
+We can see that species counts increase with individual counts, but in a plateauing/asymptotic way. We can use several estimators, including S, Chao1, and ACE estimators, to estimate the total number of species in these plots. You should read the documentation for these and make sure you understand them. But, vegan makes it easy to calculate them.
+
+```{r estimate}
+# Calculate asymptotic species richness estimates
+richness_estimates <- estimateR(species_matrix)
+
+# Print the estimates
+print(round(richness_estimates))
+
+#print rounded to nearest whole number
+print(round(richness_estimates))
+```
+
+## Beta Diversity
+
+Now we've explored lots of ways of thinking about alpha diversity. But, we haven't thought much about how the plots differ from one another. How does diversity look between plots? 
+
+There are lots of ways of approaching this question, but an important approach involves thinking about the "distances" between each plot. However, these "distances" involve multiple dimensions, so we have to think about ways of understanding those dimensions of variation.
+
+We will explore this only briefly-- these topics can be explored in much greater detail in higher-level courses in ecology and multivariate statistics-- but these will give you a taste of the types of analyses we can use.
+
+If we want to understand "dimensions" of variation in lower-dimensionsal space, we can conduct "principal components analysis". Principal Component Analysis (PCA) is a statistical technique used for dimensionality reduction, enabling the simplification of complex data sets while retaining most of the original variability. It identifies the directions (principal components) in which the data varies the most, transforming the original variables into a new set of orthogonal variables (the principal components) ranked according to their variance. PCA facilitates the visualization and analysis of the underlying patterns and relationships within the data by projecting it onto lower-dimensional spaces, typically making it easier to identify clusters, trends, and outliers. This method is widely used across various fields, including ecology, genetics, finance, and social sciences, to analyze multivariate datasets and extract meaningful insights. We'll talk more about this in class, but it can be helpful to look at online visualizations or videos to understand what's happening here.
+
+Below, we run PCA using the vegan function rda(), and then plot our data along the first two principal components. Then, we add vectors demonstrating "loadings". In Principal Component Analysis (PCA), "loadings" represent the directions of maximum variance in the data and are orthogonal to each other in the multidimensional space. Each vector points in the direction where the data spreads out most, with its length indicating the importance or contribution of that direction to the total variance in the dataset. These vectors are essentially the eigenvectors of the covariance matrix of the original variables, and their corresponding eigenvalues indicate the amount of variance captured by each principal component. Plotting these vectors helps in understanding how the original variables contribute to the principal components, allowing for the interpretation of the dimensions in terms of the original features of the data.
+
+```{r pca}
+# Conduct PCA
+pca_res <- rda(species_matrix)
+# Basic PCA plot
+plot(pca_res, display = "sites", type = "n") # 'n' to create the plot without points or text
+# Assuming you have a vector of plot IDs or labels matching the order of rows in species_matrix
+plot_labels <- rownames(species_matrix) # or a custom vector of labels
+# Add the site labels to the plot
+text(pca_res, display = "sites", labels = PlotIDs, cex=2)
+# Get scores for species to plot vectors
+species_scores <- scores(pca_res, display = "species")
+# Add vectors for species
+arrows(0, 0, species_scores[,1], species_scores[,2], col="red", length=0.1)
+# Optionally, add species names as labels near the arrowheads
+species_names <- colnames(species_matrix)
+text(species_scores[,1], species_scores[,2], labels=species_names, pos=3, cex=0.8, col="blue")
+# Get detailed summary of PCA results
+pca_summary <- summary(pca_res)
+# Variance explained by each axis
+variance_explained <- pca_summary$cont$importance["Proportion Explained",]
+variance_explained
+```
+
+Another way of thinking about "distances" between communities is to calculate a distance metric directly.
+
+The Bray-Curtis distance is a measure of dissimilarity between two samples based on their species compositions and abundances. Unlike some other metrics, the Bray-Curtis distance takes into account the abundance of species, making it especially useful for ecological data where both presence and abundance of species are important. The value of the Bray-Curtis distance ranges from 0 to 1, where 0 indicates that two sites have identical compositions (in terms of species abundances), and 1 indicates that two sites share no species in common.
+
+In ecological applications, the Bray-Curtis distance is widely used to compare community composition across different habitats or to assess changes in community structure over time. Because it sensitively reflects both the presence and abundance of species, it is particularly effective for evaluating the effects of environmental gradients, disturbances, or conservation efforts on community diversity and composition. By quantifying the ecological dissimilarity between sites, the Bray-Curtis distance provides a powerful tool for understanding biodiversity patterns, habitat specialization, and ecosystem functioning.
+
+```{r braycuurtis}
+# Calculate Bray-Curtis dissimilarity
+bray_curtis <- vegdist(species_matrix, method = "bray")
+
+# Print the Bray-Curtis dissimilarity matrix
+print(bray_curtis)
+```
+
+Non-metric Multidimensional Scaling (NMDS) is an ordination method used to visualize the similarity or dissimilarity of data points, typically ecological community data, in a reduced dimensional space. NMDS is particularly valued for its ability to handle non-linear relationships between variables and for not requiring the data to meet strict assumptions of multivariate normality. It aims to preserve the rank order of dissimilarities between data points, rather than their absolute values, making it highly effective for ecological data which often exhibits non-linear relationships.
+
+When NMDS uses the Bray-Curtis distance, it leverages this metric's sensitivity to both the presence and abundance of species in ecological communities. The Bray-Curtis distance is calculated between pairs of sites based on their species composition and abundances, generating a dissimilarity matrix. NMDS then uses this matrix to arrange the sites in a low-dimensional space (often two or three dimensions) in a way that attempts to preserve the rank order of their pairwise dissimilarities. The goal is to position sites that are compositionally similar (low Bray-Curtis distance) closer together, and those that are more dissimilar (high Bray-Curtis distance) further apart, in the ordination space.
+
+```{r nmds}
+# Conduct NMDS
+nmds_res <- metaMDS(species_matrix)
+# Fit species vectors to the NMDS ordination
+species_fit <- envfit(nmds_res, species_matrix, scaling = "species")
+# View the fitted vectors to check before plotting
+print(species_fit)
+# Basic NMDS plot
+plot(nmds_res, type = "n", main = "NMDS with Species Vectors")
+text(nmds_res, display = "sites", labels = PlotIDs, cex=2)
+#points(nmds_res, display = "sites")
+# Add species vectors
+plot(species_fit, p.max = 0.2, col = "red")  # p.max controls the significance level for displaying vectors
+```
+
+## Statistical Analysis
+
+As mentioned above, we are going to leave most discussion of further statistical analysis for advanced ecology and multivariate statistics courses. We're already covering a lot here, and the important parts to focus on for this class are understanding the ecological ideas and concepts. But, in the future, you might want to conduct some more formal statistical analyses, for example: is species diversity *significantly* different between plots? Are the communities *significantly* different in ordination space? In other words: are differences between communities "real", or, are they more distinct from one another than we would expect to see from random chance alone?
+
+Here is a brief description of some statistical tests ecologists can use.
+
+
+* Alpha Diversity Analysis: 
+As a reminder, alpha diversity refers to the diversity within a particular area or ecosystem. It measures the variety of species in a single community or habitat. Statistical analyses for alpha diversity focus on:
+
+  * Generalized Linear Models (GLMs) or Linear Mixed Models (LMMs): To test the effects of environmental variables or treatments on alpha diversity measures.
+
+  * ANOVA or Kruskal-Wallis Test: To compare alpha diversity across different groups or treatments, depending on the data distribution.
+
+* Beta Diversity Analysis: 
+As a reminder, beta diversity quantifies the change in species composition from one environment or ecosystem to another. It's about comparing the diversity between habitats. Statistical analyses for beta diversity focus on:
+
+  * Permutational Multivariate Analysis of Variance (PERMANOVA): To test the significance of the differences in species composition across groups or environmental gradients.
+
+  * Mantel Test: To assess the correlation between dissimilarity matrices and environmental distances or other matrices representing spatial or environmental variables.
+
+  * Redundancy Analysis (RDA) or Canonical Correspondence Analysis (CCA): To relate beta diversity patterns to environmental variables or gradients, identifying which factors are most strongly associated with changes in community composition.
+
+These statistical methods enable ecologists and biologists to analyze and interpret the complexities of biodiversity within and across ecosystems. By applying these analyses, researchers can uncover the underlying ecological processes, evaluate the impact of environmental changes, and inform conservation strategies.
