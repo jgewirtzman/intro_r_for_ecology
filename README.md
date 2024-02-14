@@ -9,6 +9,6 @@ Feel free to use these resources (please cite the author), and suggest topics fo
 
 The tutorials are intended for students to run, by downloading the R Markdown files (.Rmd), along with relevant data contained in the "data/" folder, which can then be sourced to the scripts. These can then be run in chunks, along with some interactive portions where students are asked to generate their own code. However, the outputs fromm the tutorials (with generated plots, etc.) are also available as HTML files in this repo, as a quick (non-interactive) resource to read/study.
 
-The easiest way to use these tools is to download the whole Github repository as a .ZIP file. When you unzip, the code should be able to source data files directly from the "Data" folder without need to further modify/move your file structure.
+The easiest way to use these tools is to download the whole Github repository as a .ZIP file (click the green "Code" button in the top-right of this page, then click "Download ZIP"). When you unzip, the code should be able to source data files directly from the "Data" folder without need to further modify/move your file structure.
 
 Happy coding!
