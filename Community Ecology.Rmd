@@ -23,6 +23,9 @@ One of the challenges of working with data is taking our own (human) language an
 
 ```{r init}
 # Load the necessary libraries
+#if you do not have these packages installed, uncomment the following lines and install them the first time you use this
+#install.packages("tidyverse")
+#install.packages("vegan")
 library(tidyverse) #tidyverse has tools for data reshaping, and also includes ggplot2
 library(vegan) #vegan is a community ecology package, short for "vegetation analysis"
 
